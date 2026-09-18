@@ -1,0 +1,1404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ledger</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F5F1E6;
+    --paper-2:#EFE9D9;
+    --ink:#1B2A3D;
+    --ink-soft:#5B6478;
+    --rule:#CFC6AF;
+    --rule-strong:#B7AC8E;
+    --brass:#A9793D;
+    --brass-soft:#D9C39E;
+    --green:#3F6B4A;
+    --green-bg:#E4EBE2;
+    --rust:#A6432E;
+    --rust-bg:#F1E1DA;
+    --tab-bg:#E9E1CD;
+    --white:#FCFAF4;
+  }
+  *{box-sizing:border-box;}
+  html, body{ max-width:100%; overflow-x:hidden; }
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Inter', sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .app{
+    max-width:980px;
+    margin:0 auto;
+    padding:28px 20px 80px;
+  }
+  .lock-screen{
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+  }
+  .lock-box{
+    max-width:340px;
+    text-align:center;
+    border:1px solid var(--rule-strong);
+    background:var(--white);
+    padding:32px 26px;
+  }
+  .lock-title{
+    font-family:'Spectral', serif;
+    font-size:20px;
+    font-weight:600;
+    margin-bottom:10px;
+  }
+  .lock-text{
+    font-size:13px;
+    color:var(--ink-soft);
+    line-height:1.5;
+  }
+  .lock-debug{
+    margin-top:14px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    color:var(--brass);
+  }
+  header.top{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    border-bottom:2px solid var(--ink);
+    padding-bottom:16px;
+    margin-bottom:24px;
+    gap:16px;
+    flex-wrap:wrap;
+    position:sticky;
+    top:0;
+    background:var(--paper);
+    z-index:5;
+    padding-top:4px;
+  }
+  header.top > div:first-child{
+    min-width:0;
+    flex:1 1 180px;
+  }
+  header.top h1{
+    font-family:'Spectral', serif;
+    font-weight:600;
+    font-size:28px;
+    margin:0 0 4px;
+    letter-spacing:0.2px;
+  }
+  header.top .sub{
+    color:var(--ink-soft);
+    font-size:13px;
+  }
+  .balance-block{
+    text-align:right;
+    min-width:0;
+    flex:1 1 200px;
+    max-width:100%;
+  }
+  .balance-label{
+    font-size:11px;
+    color:var(--ink-soft);
+    margin-bottom:2px;
+  }
+  .balance-value{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:clamp(20px, 6.5vw, 32px);
+    font-weight:600;
+    overflow-wrap:break-word;
+    word-break:break-word;
+  }
+  .balance-value.negative{ color:var(--rust); }
+  .balance-value.positive{ color:var(--green); }
+  .cur-toggle{
+    display:inline-flex;
+    margin-left:8px;
+    border:1px solid var(--rule-strong);
+    border-radius:2px;
+    overflow:hidden;
+    vertical-align:middle;
+  }
+  .cur-toggle button{
+    all:unset;
+    cursor:pointer;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10px;
+    padding:2px 7px;
+    color:var(--ink-soft);
+  }
+  .cur-toggle button.active{
+    background:var(--ink);
+    color:var(--white);
+  }
+  .rate-line{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    color:var(--ink-soft);
+    margin-top:4px;
+  }
+  .subline{
+    font-size:11px;
+    color:var(--ink-soft);
+    margin-top:3px;
+  }
+  .rate-line input{
+    width:70px;
+    padding:2px 5px;
+    font-size:11px;
+    font-family:'IBM Plex Mono', monospace;
+  }
+  .cur-select{
+    display:flex;
+    gap:4px;
+  }
+  .cur-select button{
+    all:unset;
+    cursor:pointer;
+    font-size:12px;
+    padding:7px 10px;
+    border:1px solid var(--rule-strong);
+    border-radius:2px;
+    color:var(--ink-soft);
+  }
+  .cur-select button.active{
+    background:var(--ink);
+    color:var(--white);
+    border-color:var(--ink);
+  }
+  .equiv{
+    display:block;
+    font-size:10.5px;
+    color:var(--ink-soft);
+    font-weight:400;
+  }
+  .cat-chart{
+    margin-bottom:24px;
+    padding:16px 18px;
+    background:var(--white);
+    border:1px solid var(--rule);
+  }
+  .cat-row{
+    display:grid;
+    grid-template-columns:100px 1fr 90px;
+    align-items:center;
+    gap:10px;
+    padding:5px 0;
+  }
+  .cat-label{
+    font-size:12.5px;
+    color:var(--ink-soft);
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .cat-bar-track{
+    height:8px;
+    background:var(--paper-2);
+    border-radius:1px;
+    overflow:hidden;
+  }
+  .cat-bar-fill{
+    height:100%;
+    background:var(--brass);
+    border-radius:1px;
+  }
+  .cat-amount{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12px;
+    text-align:right;
+    color:var(--ink);
+  }
+  .quick-add-row{
+    display:flex;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:8px;
+    margin-bottom:16px;
+  }
+  .quick-add-label{
+    font-size:11px;
+    color:var(--ink-soft);
+    text-transform:uppercase;
+    letter-spacing:0.4px;
+  }
+  .chip{
+    all:unset;
+    cursor:pointer;
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12px;
+    padding:6px 10px;
+    border:1px solid var(--brass-soft);
+    background:var(--paper-2);
+    color:var(--ink);
+    border-radius:2px;
+  }
+  .chip:hover{ border-color:var(--brass); }
+  .chip-x{
+    color:var(--ink-soft);
+    font-family:'Inter', sans-serif;
+    font-size:13px;
+    padding:0 2px;
+  }
+  .chip-x:hover{ color:var(--rust); }
+  .checkbox-field{
+    justify-content:flex-end;
+    padding-bottom:8px;
+  }
+  .checkbox-field label{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    font-size:12px;
+    color:var(--ink-soft);
+    text-transform:none;
+    letter-spacing:0;
+    cursor:pointer;
+    white-space:normal;
+  }
+  .checkbox-field input[type="checkbox"]{
+    width:auto;
+    padding:0;
+  }
+
+  .layout{
+    display:grid;
+    grid-template-columns:150px 1fr;
+    gap:0;
+    border:1px solid var(--rule-strong);
+    background:var(--white);
+    min-height:520px;
+  }
+  nav.tabs{
+    background:var(--tab-bg);
+    border-right:1px solid var(--rule-strong);
+    display:flex;
+    flex-direction:column;
+    padding:18px 0;
+  }
+  nav.tabs button{
+    all:unset;
+    cursor:pointer;
+    font-family:'Spectral', serif;
+    font-size:15px;
+    padding:12px 18px;
+    color:var(--ink-soft);
+    border-left:3px solid transparent;
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+  }
+  nav.tabs button .count{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    color:var(--ink-soft);
+    opacity:0.7;
+  }
+  nav.tabs button:hover{ background:var(--paper-2); }
+  nav.tabs button.active{
+    color:var(--ink);
+    background:var(--white);
+    border-left-color:var(--brass);
+    font-weight:600;
+  }
+
+  .panel{
+    padding:26px 30px;
+  }
+  .panel h2{
+    font-family:'Spectral', serif;
+    font-size:19px;
+    margin:0 0 4px;
+  }
+  .panel .desc{
+    color:var(--ink-soft);
+    font-size:13px;
+    margin:0 0 20px;
+  }
+
+  .summary-grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:1px;
+    background:var(--rule);
+    border:1px solid var(--rule);
+    margin-bottom:26px;
+  }
+  .summary-cell{
+    background:var(--white);
+    padding:16px 18px;
+  }
+  .summary-cell .label{
+    font-size:11px;
+    color:var(--ink-soft);
+    margin-bottom:6px;
+  }
+  .summary-cell .value{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:20px;
+    font-weight:600;
+  }
+  .summary-cell.income .value{ color:var(--green); }
+  .summary-cell.perm .value{ color:var(--rust); }
+  .summary-cell.temp .value{ color:var(--brass); }
+
+  form.entry-form{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(100px, 1fr));
+    gap:8px;
+    margin-bottom:22px;
+    align-items:end;
+  }
+  form.entry-form.temp-form{
+    grid-template-columns:repeat(auto-fit, minmax(100px, 1fr));
+  }
+  form.entry-form > button.add-btn{
+    justify-self:start;
+  }
+  .field{
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+  }
+  .field label{
+    font-size:10.5px;
+    color:var(--ink-soft);
+    text-transform:uppercase;
+    letter-spacing:0.4px;
+  }
+  input, select{
+    font-family:'Inter', sans-serif;
+    font-size:13.5px;
+    padding:8px 9px;
+    border:1px solid var(--rule-strong);
+    background:var(--white);
+    color:var(--ink);
+    border-radius:2px;
+    max-width:100%;
+    width:100%;
+  }
+  input:focus, select:focus{
+    outline:none;
+    border-color:var(--brass);
+  }
+  button.add-btn{
+    font-family:'Inter', sans-serif;
+    font-weight:600;
+    font-size:13px;
+    padding:9px 16px;
+    background:var(--ink);
+    color:var(--white);
+    border:none;
+    border-radius:2px;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  button.add-btn:hover{ background:#2b3d54; }
+
+  table.ledger{
+    width:100%;
+    border-collapse:collapse;
+    font-size:13.5px;
+  }
+  .table-wrap{
+    overflow-x:auto;
+    max-width:100%;
+  }
+  table.ledger thead th{
+    text-align:left;
+    font-size:10.5px;
+    text-transform:uppercase;
+    letter-spacing:0.4px;
+    color:var(--ink-soft);
+    border-bottom:1px solid var(--rule-strong);
+    padding:6px 8px;
+    font-weight:600;
+  }
+  table.ledger tbody tr{
+    border-bottom:1px solid var(--rule);
+  }
+  table.ledger tbody tr:hover{ background:var(--paper-2); }
+  table.ledger td{
+    padding:9px 8px;
+    vertical-align:top;
+  }
+  td.amount{
+    font-family:'IBM Plex Mono', monospace;
+    text-align:right;
+    white-space:nowrap;
+  }
+  td.amount.income{ color:var(--green); }
+  td.amount.perm{ color:var(--rust); }
+  .note-cell{ color:var(--ink-soft); }
+  .empty-row td{
+    text-align:center;
+    color:var(--ink-soft);
+    padding:34px 0;
+    font-style:italic;
+  }
+  .del-btn{
+    all:unset;
+    cursor:pointer;
+    color:var(--ink-soft);
+    font-size:12px;
+    border:1px solid var(--rule-strong);
+    border-radius:2px;
+    padding:3px 7px;
+  }
+  .del-btn:hover{ color:var(--rust); border-color:var(--rust); }
+
+  .status-pill{
+    display:inline-block;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10.5px;
+    padding:2px 7px;
+    border-radius:2px;
+  }
+  .status-pill.outstanding{ background:var(--rust-bg); color:var(--rust); }
+  .status-pill.settled{ background:var(--green-bg); color:var(--green); }
+  .status-pill.overdue{ background:var(--rust); color:var(--white); font-weight:600; }
+  .expect-line{
+    font-size:11.5px;
+    color:var(--brass);
+    margin-bottom:4px;
+  }
+
+  .return-row{
+    display:flex;
+    gap:6px;
+    align-items:center;
+    margin-top:6px;
+  }
+  .return-row input{ width:90px; }
+  .return-row button{
+    all:unset;
+    cursor:pointer;
+    font-size:11.5px;
+    padding:5px 9px;
+    border:1px solid var(--brass);
+    color:var(--brass);
+    border-radius:2px;
+  }
+  .return-row button:hover{ background:var(--brass); color:var(--white); }
+  .returns-list{
+    margin-top:4px;
+    font-size:11.5px;
+    color:var(--ink-soft);
+  }
+  .returns-list div{ padding:1px 0; }
+
+  footer.hint{
+    text-align:center;
+    font-size:11.5px;
+    color:var(--ink-soft);
+    margin-top:14px;
+  }
+
+  .save-warning{
+    margin-top:10px;
+    padding:8px 12px;
+    background:var(--rust-bg);
+    color:var(--rust);
+    font-size:12px;
+    text-align:center;
+    border:1px solid var(--rust);
+    border-radius:2px;
+  }
+
+  .backup-row{
+    display:flex;
+    justify-content:center;
+    gap:8px;
+    margin-top:14px;
+    flex-wrap:wrap;
+  }
+  .backup-btn{
+    all:unset;
+    cursor:pointer;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    padding:6px 10px;
+    border:1px solid var(--rule-strong);
+    color:var(--ink-soft);
+    border-radius:2px;
+  }
+  .backup-btn:hover{ border-color:var(--brass); color:var(--brass); }
+
+  @media (max-width:680px){
+    .app{ padding:18px 12px 70px; }
+    .layout{ grid-template-columns:1fr; }
+    nav.tabs{
+      flex-direction:row;
+      overflow-x:auto;
+      -webkit-overflow-scrolling:touch;
+      border-right:none;
+      border-bottom:1px solid var(--rule-strong);
+      padding:8px 4px;
+    }
+    nav.tabs button{
+      border-left:none;
+      border-bottom:3px solid transparent;
+      padding:8px 12px;
+      white-space:nowrap;
+    }
+    nav.tabs button.active{ border-bottom-color:var(--brass); }
+    .panel{ padding:18px 14px; }
+    .summary-grid{ grid-template-columns:1fr; }
+    .cat-row{ grid-template-columns:70px 1fr 70px; gap:6px; }
+    .cat-label{ font-size:11px; }
+    .cat-amount{ font-size:11px; }
+    table.ledger{ font-size:12px; }
+  }
+
+  @media (max-width:480px){
+    header.top{ flex-direction:column; align-items:flex-start; padding-bottom:12px; }
+    .balance-block{ text-align:left; width:100%; }
+    .rate-line{ display:flex; align-items:center; flex-wrap:wrap; gap:4px; }
+    form.entry-form > button.add-btn{ justify-self:stretch; }
+  }
+</style>
+</head>
+<body>
+
+<div class="lock-screen" id="lockScreen" style="display:none;">
+  <div class="lock-box">
+    <div class="lock-title">Ledger is private</div>
+    <div class="lock-text">This app is set up for certain Telegram accounts only, and this isn't one of them.</div>
+    <div class="lock-debug" id="lockDebug"></div>
+  </div>
+</div>
+
+<div class="app" id="appRoot">
+  <header class="top">
+    <div>
+      <h1>Ledger</h1>
+      <div class="sub">Personal accounting — income, spending, and money on loan</div>
+    </div>
+    <div class="balance-block">
+      <div class="balance-label">
+        Net worth
+        <span class="cur-toggle">
+          <button type="button" data-cur="USD" id="curBtnUSD">USD</button><button type="button" data-cur="UZS" id="curBtnUZS">UZS</button>
+        </span>
+      </div>
+      <div class="balance-value" id="balanceValue">$0.00</div>
+      <div class="subline" id="netWorthSubline">Cash on hand: $0.00 · Owed to you: $0.00</div>
+      <div class="rate-line">
+        1 USD = <input type="number" id="rateInput" step="1" min="1"> UZS
+      </div>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav class="tabs">
+      <button data-tab="summary" class="active">Summary</button>
+      <button data-tab="income">Income <span class="count" id="cnt-income"></span></button>
+      <button data-tab="permanent">Spending <span class="count" id="cnt-permanent"></span></button>
+      <button data-tab="temporary">On loan <span class="count" id="cnt-temporary"></span></button>
+    </nav>
+
+    <div class="panel" id="panel"></div>
+  </div>
+
+  <footer class="hint" id="storageHint">Entries are saved automatically and stay here next time you open this.</footer>
+  <div id="saveWarning" class="save-warning" style="display:none;"></div>
+  <div class="backup-row">
+    <button type="button" class="backup-btn" id="exportBtn">Export backup (.json)</button>
+    <label class="backup-btn" for="importInput">Import backup</label>
+    <input type="file" id="importInput" accept="application/json" style="display:none;">
+  </div>
+</div>
+
+<script>
+const TG = window.Telegram && window.Telegram.WebApp;
+const initData = TG ? TG.initData : null; // raw string Telegram signs; sent to the API for auth
+const useApi = !!initData; // real Telegram session -> talk to the database
+
+// Add every Telegram username that should be allowed in (no @, one per entry).
+// This client-side list is just for showing/hiding the UI quickly — the real
+// check happens server-side in api/_auth.js against ALLOWED_USERNAMES there,
+// so keep both lists in sync.
+const ALLOWED_USERNAMES = ['yaxyobekpersonal', 'usikandsomenmbrs'];
+
+if(TG){
+  TG.ready();
+  TG.expand();
+  try{ TG.setHeaderColor('#1B2A3D'); }catch(e){}
+  try{ TG.setBackgroundColor('#F5F1E6'); }catch(e){}
+}
+
+// Strips a leading @, trims spaces, and lowercases — so it matches
+// regardless of how the username was typed on either side.
+function normalizeUsername(u){
+  if(!u) return null;
+  return u.trim().replace(/^@/, '').toLowerCase();
+}
+
+function currentTelegramUsername(){
+  const u = TG && TG.initDataUnsafe && TG.initDataUnsafe.user && TG.initDataUnsafe.user.username;
+  return u || null;
+}
+
+function isAuthorized(){
+  // Outside Telegram (e.g. testing this file directly in a browser) there's
+  // no Telegram identity to check, so allow it through for local testing.
+  // This is just a UI convenience — the API independently re-checks every
+  // request against the bot-signed initData, so this can't be bypassed to
+  // actually read or write real data.
+  if(!TG) return true;
+  const username = normalizeUsername(currentTelegramUsername());
+  const allowed = ALLOWED_USERNAMES.map(normalizeUsername);
+  return username !== null && allowed.includes(username);
+}
+
+async function apiFetch(path, options){
+  options = options || {};
+  const res = await fetch(path, {
+    method: options.method || 'GET',
+    headers: Object.assign(
+      {'Content-Type': 'application/json'},
+      initData ? {'X-Telegram-Init-Data': initData} : {},
+      options.headers || {}
+    ),
+    body: options.body ? JSON.stringify(options.body) : undefined
+  });
+  if(!res.ok){
+    const body = await res.json().catch(()=>({}));
+    throw new Error(body.error || ('Request failed: ' + res.status));
+  }
+  return res.status === 204 ? null : res.json();
+}
+
+// Storage adapter: talks to the Neon-backed API when running inside
+// Telegram (real, durable, synced across devices), falls back to
+// localStorage otherwise (e.g. when testing this file directly in a
+// normal browser, where there's no signed Telegram session to authenticate
+// API calls with).
+const Store = {
+  saveEntry(type, entry){
+    if(useApi) return apiFetch('/api/entry', { method:'POST', body:{ type, entry } });
+    return new Promise((resolve, reject)=>{
+      try{ localStorage.setItem(type + ':' + entry.id, JSON.stringify(entry)); resolve(); }
+      catch(e){ reject(e); }
+    });
+  },
+  deleteEntry(type, id){
+    if(useApi) return apiFetch('/api/entry?id=' + encodeURIComponent(id), { method:'DELETE' });
+    return new Promise((resolve, reject)=>{
+      try{ localStorage.removeItem(type + ':' + id); resolve(); }
+      catch(e){ reject(e); }
+    });
+  },
+  saveKv(key, value){
+    if(useApi) return apiFetch('/api/kv', { method:'POST', body:{ key, value } });
+    return new Promise((resolve, reject)=>{
+      try{ localStorage.setItem(key, JSON.stringify(value)); resolve(); }
+      catch(e){ reject(e); }
+    });
+  },
+  async loadAll(){
+    if(useApi) return apiFetch('/api/state');
+    // Local dev fallback: rebuild the same shape from localStorage.
+    const out = { income:[], permanent:[], temporary:[], settings:null, templates:null };
+    Object.keys(localStorage).forEach(k=>{
+      if(k === 'settings'){ out.settings = JSON.parse(localStorage.getItem(k)); }
+      else if(k === 'templates'){ out.templates = JSON.parse(localStorage.getItem(k)); }
+      else {
+        const type = k.split(':')[0];
+        if(out[type]) out[type].push(JSON.parse(localStorage.getItem(k)));
+      }
+    });
+    return out;
+  }
+};
+
+// Surfaces storage failures in the UI instead of letting them fail silently.
+// A failed save means the entry only exists in memory for this session and
+// will be gone next time the app opens, so the user needs to know right away.
+function markSaveFailed(err){
+  console.error('Save failed', err);
+  const el = document.getElementById('saveWarning');
+  if(!el) return;
+  el.textContent = "Couldn't save that — it may be lost when you close the app. Check your connection and try again, or use Export backup below as a safety net.";
+  el.style.display = 'block';
+}
+function markSaveOk(){
+  const el = document.getElementById('saveWarning');
+  if(el) el.style.display = 'none';
+}
+
+let state = {
+  income: [],
+  permanent: [],
+  temporary: [],
+  settings: { rate: 11800, displayCurrency: 'USD' },
+  templates: { income: [] }
+};
+
+let activeTab = 'summary';
+
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+
+// Format a number in a given currency
+function fmtCur(n, currency){
+  const sign = n < 0 ? '-' : '';
+  const abs = Math.abs(n);
+  if(currency === 'UZS'){
+    return sign + abs.toLocaleString(undefined, {maximumFractionDigits:0}) + ' UZS';
+  }
+  return sign + '$' + abs.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+// Backwards-compatible plain formatter, defaults to the display currency
+function fmt(n){ return fmtCur(n, state.settings.displayCurrency); }
+
+function rate(){ return state.settings.rate || 1; }
+
+// Convert an amount from one currency to another using the CURRENT rate.
+// Only ever call this at the moment a record is created — never at render
+// time — so historical entries stay fixed even if the rate changes later.
+function convertNow(amount, from, to){
+  if(from === to) return amount;
+  if(from === 'USD' && to === 'UZS') return amount * rate();
+  if(from === 'UZS' && to === 'USD') return amount / rate();
+  return amount;
+}
+
+// Freeze both currency values onto a record (an entry or a return) using
+// today's rate, so future rate edits never change what already happened.
+function freezeAmounts(obj){
+  const cur = obj.currency || 'USD';
+  if(cur === 'USD'){
+    obj.amountUSD = obj.amount;
+    obj.amountUZS = convertNow(obj.amount, 'USD', 'UZS');
+  } else {
+    obj.amountUZS = obj.amount;
+    obj.amountUSD = convertNow(obj.amount, 'UZS', 'USD');
+  }
+  if(obj.rateAtEntry === undefined) obj.rateAtEntry = rate();
+  return obj;
+}
+
+// Read a record's frozen value in a given currency (falls back to
+// converting live, only for legacy records that predate freezing).
+function valueIn(obj, currency){
+  const key = currency === 'USD' ? 'amountUSD' : 'amountUZS';
+  if(obj[key] !== undefined) return obj[key];
+  return convertNow(obj.amount, obj.currency || 'USD', currency);
+}
+
+// A record's value in whichever currency is currently displayed.
+function displayVal(obj){
+  return valueIn(obj, state.settings.displayCurrency);
+}
+
+// Migrate a legacy record (saved before dual-currency freezing existed) by
+// freezing it once using today's rate, then persisting it so it stays put.
+function migrateIfNeeded(type, obj){
+  if(obj.amountUSD === undefined || obj.amountUZS === undefined){
+    freezeAmounts(obj);
+    return true;
+  }
+  return false;
+}
+
+// Freeze the amount a temporary (on-loan) entry expects back, covering
+// interest, profit, or a plain principal-only return. Uses the same rate
+// captured when the entry itself was frozen, so it never drifts either.
+function freezeExpected(entry){
+  if(entry.expectedAmount === undefined || entry.expectedAmount === null || isNaN(entry.expectedAmount)){
+    entry.expectedAmount = entry.amount;
+  }
+  const cur = entry.currency || 'USD';
+  if(cur === 'USD'){
+    entry.expectedAmountUSD = entry.expectedAmount;
+    entry.expectedAmountUZS = entry.expectedAmount * (entry.rateAtEntry || rate());
+  } else {
+    entry.expectedAmountUZS = entry.expectedAmount;
+    entry.expectedAmountUSD = entry.expectedAmount / (entry.rateAtEntry || rate());
+  }
+}
+
+// Backfill expectedAmount on temporary entries saved before this feature
+// existed — they simply expect back exactly what went out (no interest).
+function migrateExpectedIfNeeded(entry){
+  if(entry.expectedAmount === undefined){
+    entry.expectedAmount = entry.amount;
+    entry.expectedAmountUSD = entry.amountUSD;
+    entry.expectedAmountUZS = entry.amountUZS;
+    return true;
+  }
+  return false;
+}
+
+// Read a record's frozen "expected" value in a given currency.
+function expectedValueIn(obj, currency){
+  const key = currency === 'USD' ? 'expectedAmountUSD' : 'expectedAmountUZS';
+  return obj[key] !== undefined ? obj[key] : obj.expectedAmount;
+}
+
+// Each record (income/permanent/temporary entry, and settings) is stored
+// under its own small key, since CloudStorage caps each value's size.
+async function loadState(){
+  try{
+    const data = await Store.loadAll();
+    if(data.settings) state.settings = Object.assign(state.settings, data.settings);
+    if(data.templates) state.templates = Object.assign({income:[]}, data.templates);
+    ['income','permanent','temporary'].forEach(type=>{
+      (data[type] || []).forEach(entry=>{
+        try{
+          let dirty = migrateIfNeeded(type, entry);
+          if(type === 'temporary' && migrateExpectedIfNeeded(entry)) dirty = true;
+          (entry.returns||[]).forEach(r=>{ if(migrateIfNeeded(type, r)) dirty = true; });
+          state[type].push(entry);
+          if(dirty) saveEntry(type, entry);
+        }catch(e){ /* skip a corrupted record */ }
+      });
+    });
+  }catch(e){
+    console.error('Could not load saved data', e);
+    const el = document.getElementById('saveWarning');
+    if(el){
+      el.textContent = "Couldn't load your saved data. If entries seem missing, don't add new ones yet — check your connection and reopen the app first.";
+      el.style.display = 'block';
+    }
+  }
+  render();
+}
+
+function saveEntry(type, entry){ return Store.saveEntry(type, entry).then(markSaveOk, markSaveFailed); }
+function deleteEntry(type, id){ return Store.deleteEntry(type, id).then(markSaveOk, markSaveFailed); }
+function saveSettings(){ return Store.saveKv('settings', state.settings).then(markSaveOk, markSaveFailed); }
+function saveTemplates(){ return Store.saveKv('templates', state.templates).then(markSaveOk, markSaveFailed); }
+
+function totals(){
+  const income = state.income.reduce((s,e)=>s + displayVal(e), 0);
+  const permanent = state.permanent.reduce((s,e)=>s + displayVal(e), 0);
+  let tempOut = 0, tempReturned = 0, tempExpected = 0;
+  state.temporary.forEach(e=>{
+    tempOut += displayVal(e);
+    tempExpected += expectedValueIn(e, state.settings.displayCurrency);
+    tempReturned += (e.returns||[]).reduce((s,r)=>s + displayVal(r), 0);
+  });
+  // "Outstanding" tracks what's still owed toward the expected return
+  // (principal plus any interest/profit) — balance below only ever
+  // reflects actual cash that has moved, never the not-yet-earned part.
+  const outstanding = tempExpected - tempReturned;
+  const balance = income - permanent - tempOut + tempReturned;
+  return {income, permanent, tempOut, tempReturned, tempExpected, outstanding, balance};
+}
+
+function updateBalance(){
+  const t = totals();
+  const netWorth = t.balance + t.outstanding;
+  const el = document.getElementById('balanceValue');
+  el.textContent = fmt(netWorth);
+  el.className = 'balance-value ' + (netWorth < 0 ? 'negative' : 'positive');
+  document.getElementById('netWorthSubline').textContent =
+    'Cash on hand: ' + fmt(t.balance) + ' · Owed to you: ' + fmt(t.outstanding);
+  document.getElementById('cnt-income').textContent = state.income.length || '';
+  document.getElementById('cnt-permanent').textContent = state.permanent.length || '';
+  document.getElementById('cnt-temporary').textContent = state.temporary.length || '';
+
+  document.getElementById('curBtnUSD').classList.toggle('active', state.settings.displayCurrency === 'USD');
+  document.getElementById('curBtnUZS').classList.toggle('active', state.settings.displayCurrency === 'UZS');
+  const rateInput = document.getElementById('rateInput');
+  if(document.activeElement !== rateInput) rateInput.value = state.settings.rate;
+}
+
+document.getElementById('curBtnUSD').addEventListener('click', ()=>{ state.settings.displayCurrency = 'USD'; saveSettings(); render(); });
+document.getElementById('curBtnUZS').addEventListener('click', ()=>{ state.settings.displayCurrency = 'UZS'; saveSettings(); render(); });
+document.getElementById('rateInput').addEventListener('change', (e)=>{
+  const v = parseFloat(e.target.value);
+  if(v > 0){ state.settings.rate = v; saveSettings(); render(); }
+});
+
+function switchTab(tab){
+  activeTab = tab;
+  document.querySelectorAll('nav.tabs button').forEach(b=>{
+    b.classList.toggle('active', b.dataset.tab === tab);
+  });
+  render();
+}
+
+document.querySelectorAll('nav.tabs button').forEach(b=>{
+  b.addEventListener('click', ()=>switchTab(b.dataset.tab));
+});
+
+function render(){
+  updateBalance();
+  const panel = document.getElementById('panel');
+  if(activeTab === 'summary') panel.innerHTML = renderSummary();
+  else if(activeTab === 'income') panel.innerHTML = renderIncome();
+  else if(activeTab === 'permanent') panel.innerHTML = renderPermanent();
+  else if(activeTab === 'temporary') panel.innerHTML = renderTemporary();
+  attachHandlers();
+}
+
+function renderSummary(){
+  const t = totals();
+  const recent = [
+    ...state.income.map(e=>({...e, kind:'Income'})),
+    ...state.permanent.map(e=>({...e, kind:'Spending'})),
+    ...state.temporary.map(e=>({...e, kind:'On loan'}))
+  ].sort((a,b)=> b.date.localeCompare(a.date) || b.id.localeCompare(a.id)).slice(0,8);
+
+  return `
+    <h2>Summary</h2>
+    <p class="desc">A quick read on where things stand.</p>
+    <div class="summary-grid">
+      <div class="summary-cell income">
+        <div class="label">Total income (${state.settings.displayCurrency})</div>
+        <div class="value">${fmt(t.income)}</div>
+      </div>
+      <div class="summary-cell perm">
+        <div class="label">Total spending (${state.settings.displayCurrency})</div>
+        <div class="value">${fmt(t.permanent)}</div>
+      </div>
+      <div class="summary-cell temp">
+        <div class="label">Outstanding on loan (${state.settings.displayCurrency})</div>
+        <div class="value">${fmt(t.outstanding)}</div>
+      </div>
+    </div>
+    <p class="desc" style="margin-top:-14px;margin-bottom:22px;">Each entry keeps the USD and UZS value it had on the day it was added, so past entries won't shift if the rate changes later. Current rate: 1 USD = ${rate().toLocaleString()} UZS.</p>
+    <h2 style="font-size:15px;margin-bottom:10px;">Recent entries</h2>
+    <div class="table-wrap"><table class="ledger">
+      <thead><tr><th>Date</th><th>Type</th><th>Note</th><th style="text-align:right;">Amount</th></tr></thead>
+      <tbody>
+        ${recent.length ? recent.map(e=>{
+          const cur = e.currency || 'USD';
+          const sign = e.kind==='Income' ? '+' : '−';
+          const equiv = cur !== state.settings.displayCurrency ? `<span class="equiv">≈ ${fmtCur(displayVal(e), state.settings.displayCurrency)}</span>` : '';
+          return `
+          <tr>
+            <td>${e.date}</td>
+            <td>${e.kind}</td>
+            <td class="note-cell">${e.note || e.category || ''}</td>
+            <td class="amount ${e.kind==='Income' ? 'income':'perm'}">${sign}${fmtCur(e.amount, cur)}${equiv}</td>
+          </tr>
+        `}).join('') : `<tr class="empty-row"><td colspan="4">Nothing recorded yet — add your first entry from a tab on the left.</td></tr>`}
+      </tbody>
+    </table></div>
+  `;
+}
+
+function renderIncome(){
+  const rows = [...state.income].sort((a,b)=>b.date.localeCompare(a.date));
+  const templates = state.templates.income || [];
+  return `
+    <h2>Income</h2>
+    <p class="desc">Money coming in — salary, freelance, gifts, anything.</p>
+    ${templates.length ? `
+      <div class="quick-add-row">
+        <span class="quick-add-label">Quick add:</span>
+        ${templates.map(t=>`
+          <button type="button" class="chip" data-template="${t.id}">
+            ${t.source} · ${fmtCur(t.amount, t.currency)}
+            <span class="chip-x" data-del-template="${t.id}" title="Remove template">×</span>
+          </button>
+        `).join('')}
+      </div>
+    ` : ''}
+    <form class="entry-form" id="incomeForm">
+      <div class="field"><label>Date</label><input type="date" name="date" value="${todayStr()}" required></div>
+      <div class="field"><label>Source</label><input type="text" name="source" placeholder="e.g. Salary" required></div>
+      <div class="field"><label>Amount</label><input type="number" name="amount" step="0.01" min="0" placeholder="0.00" required></div>
+      <div class="field"><label>Currency</label>
+        <div class="cur-select">
+          <button type="button" class="cur-opt active" data-curopt="USD">USD</button>
+          <button type="button" class="cur-opt" data-curopt="UZS">UZS</button>
+        </div>
+        <input type="hidden" name="currency" value="USD">
+      </div>
+      <div class="field"><label>Note</label><input type="text" name="note" placeholder="optional"></div>
+      <div class="field checkbox-field"><label><input type="checkbox" name="saveTemplate"> Save as quick add</label></div>
+      <button type="submit" class="add-btn">Add income</button>
+    </form>
+    <div class="table-wrap"><table class="ledger">
+      <thead><tr><th>Date</th><th>Source</th><th>Note</th><th style="text-align:right;">Amount</th><th></th></tr></thead>
+      <tbody>
+        ${rows.length ? rows.map(e=>{
+          const cur = e.currency || 'USD';
+          const equiv = cur !== state.settings.displayCurrency ? `<span class="equiv">≈ ${fmtCur(displayVal(e), state.settings.displayCurrency)}</span>` : '';
+          return `
+          <tr>
+            <td>${e.date}</td>
+            <td>${e.source}</td>
+            <td class="note-cell">${e.note||''}</td>
+            <td class="amount income">+${fmtCur(e.amount, cur)}${equiv}</td>
+            <td><button class="del-btn" data-del="income" data-id="${e.id}">Remove</button></td>
+          </tr>
+        `}).join('') : `<tr class="empty-row"><td colspan="5">No income recorded yet.</td></tr>`}
+      </tbody>
+    </table></div>
+  `;
+}
+
+function categoryBreakdown(list){
+  const cur = state.settings.displayCurrency;
+  const totalsByCat = {};
+  list.forEach(e=>{
+    const cat = e.category || 'Other';
+    totalsByCat[cat] = (totalsByCat[cat] || 0) + displayVal(e);
+  });
+  const rows = Object.keys(totalsByCat).map(cat=>({cat, total: totalsByCat[cat]}));
+  rows.sort((a,b)=>b.total - a.total);
+  const max = rows.length ? rows[0].total : 0;
+  return { rows, max, cur };
+}
+
+function renderCategoryChart(list){
+  const { rows, max, cur } = categoryBreakdown(list);
+  if(!rows.length) return '';
+  return `
+    <div class="cat-chart">
+      ${rows.map(r=>`
+        <div class="cat-row">
+          <div class="cat-label">${r.cat}</div>
+          <div class="cat-bar-track"><div class="cat-bar-fill" style="width:${max ? (r.total/max*100) : 0}%"></div></div>
+          <div class="cat-amount">${fmtCur(r.total, cur)}</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function renderPermanent(){
+  const rows = [...state.permanent].sort((a,b)=>b.date.localeCompare(a.date));
+  return `
+    <h2>Spending</h2>
+    <p class="desc">Regular, non-recoverable spending — food, clothes, taxi, bills.</p>
+    ${renderCategoryChart(state.permanent)}
+    <form class="entry-form" id="permanentForm">
+      <div class="field"><label>Date</label><input type="date" name="date" value="${todayStr()}" required></div>
+      <div class="field"><label>Category</label>
+        <input list="permCategories" name="category" placeholder="e.g. Food" required>
+        <datalist id="permCategories">
+          <option value="Food"><option value="Clothes"><option value="Taxi">
+          <option value="Rent"><option value="Utilities"><option value="Health">
+          <option value="Entertainment"><option value="Other">
+        </datalist>
+      </div>
+      <div class="field"><label>Amount</label><input type="number" name="amount" step="0.01" min="0" placeholder="0.00" required></div>
+      <div class="field"><label>Currency</label>
+        <div class="cur-select">
+          <button type="button" class="cur-opt active" data-curopt="USD">USD</button>
+          <button type="button" class="cur-opt" data-curopt="UZS">UZS</button>
+        </div>
+        <input type="hidden" name="currency" value="USD">
+      </div>
+      <div class="field"><label>Note</label><input type="text" name="note" placeholder="optional"></div>
+      <button type="submit" class="add-btn">Add spending</button>
+    </form>
+    <div class="table-wrap"><table class="ledger">
+      <thead><tr><th>Date</th><th>Category</th><th>Note</th><th style="text-align:right;">Amount</th><th></th></tr></thead>
+      <tbody>
+        ${rows.length ? rows.map(e=>{
+          const cur = e.currency || 'USD';
+          const equiv = cur !== state.settings.displayCurrency ? `<span class="equiv">≈ ${fmtCur(displayVal(e), state.settings.displayCurrency)}</span>` : '';
+          return `
+          <tr>
+            <td>${e.date}</td>
+            <td>${e.category}</td>
+            <td class="note-cell">${e.note||''}</td>
+            <td class="amount perm">−${fmtCur(e.amount, cur)}${equiv}</td>
+            <td><button class="del-btn" data-del="permanent" data-id="${e.id}">Remove</button></td>
+          </tr>
+        `}).join('') : `<tr class="empty-row"><td colspan="5">No spending recorded yet.</td></tr>`}
+      </tbody>
+    </table></div>
+  `;
+}
+
+function renderTemporary(){
+  const rows = [...state.temporary].sort((a,b)=>b.date.localeCompare(a.date));
+  return `
+    <h2>On loan</h2>
+    <p class="desc">Money out that could come back — investments, loans given, purchase obligations, deposits — with an optional expected return and due date.</p>
+    <form class="entry-form temp-form" id="temporaryForm">
+      <div class="field"><label>Date</label><input type="date" name="date" value="${todayStr()}" required></div>
+      <div class="field"><label>Category</label>
+        <input list="tempCategories" name="category" placeholder="e.g. Investment" required>
+        <datalist id="tempCategories">
+          <option value="Investment"><option value="Loan given"><option value="Purchase obligation"><option value="Deposit"><option value="Other">
+        </datalist>
+      </div>
+      <div class="field"><label>Amount</label><input type="number" name="amount" step="0.01" min="0" placeholder="0.00" required></div>
+      <div class="field"><label>Currency</label>
+        <div class="cur-select">
+          <button type="button" class="cur-opt active" data-curopt="USD">USD</button>
+          <button type="button" class="cur-opt" data-curopt="UZS">UZS</button>
+        </div>
+        <input type="hidden" name="currency" value="USD">
+      </div>
+      <div class="field"><label>Expected back</label><input type="number" name="expectedAmount" step="0.01" min="0" placeholder="same as amount"></div>
+      <div class="field"><label>Interest / return %</label><input type="number" name="interestRate" step="0.01" placeholder="optional"></div>
+      <div class="field"><label>Due date</label><input type="date" name="dueDate"></div>
+      <div class="field"><label>Note</label><input type="text" name="note" placeholder="optional"></div>
+      <button type="submit" class="add-btn">Add entry</button>
+    </form>
+    <div class="table-wrap"><table class="ledger">
+      <thead><tr><th>Date</th><th>Category</th><th>Note / returns</th><th style="text-align:right;">Amount</th><th></th></tr></thead>
+      <tbody>
+        ${rows.length ? rows.map(e=>{
+          const cur = e.currency || 'USD';
+          const returnedInCur = (e.returns||[]).reduce((s,r)=> s + valueIn(r, cur), 0);
+          const target = expectedValueIn(e, cur);
+          const outstanding = target - returnedInCur;
+          const settled = outstanding <= 0.004;
+          const overdue = !settled && e.dueDate && todayStr() > e.dueDate;
+          const hasExtra = (e.expectedAmount !== e.amount) || e.dueDate;
+          const equiv = cur !== state.settings.displayCurrency ? `<span class="equiv">≈ ${fmtCur(displayVal(e), state.settings.displayCurrency)}</span>` : '';
+          let pillClass = settled ? 'settled' : (overdue ? 'overdue' : 'outstanding');
+          let pillText = settled ? 'settled' : (overdue ? fmtCur(outstanding, cur) + ' overdue' : fmtCur(outstanding, cur) + ' outstanding');
+          return `
+          <tr>
+            <td>${e.date}</td>
+            <td>${e.category}</td>
+            <td class="note-cell">
+              ${e.note ? `<div>${e.note}</div>` : ''}
+              ${hasExtra && !settled ? `<div class="expect-line">Expect ${fmtCur(e.expectedAmount, cur)} back${e.interestRate ? ' (' + e.interestRate + '%)' : ''}${e.dueDate ? ' by ' + e.dueDate : ''}</div>` : ''}
+              <span class="status-pill ${pillClass}">${pillText}</span>
+              ${(e.returns||[]).length ? `<div class="returns-list">${e.returns.map(r=>`<div>Returned ${fmtCur(r.amount, r.currency||cur)} on ${r.date}</div>`).join('')}</div>` : ''}
+              ${!settled ? `
+                <div class="return-row">
+                  <input type="number" step="0.01" min="0" placeholder="amount" id="return-amt-${e.id}">
+                  <select id="return-cur-${e.id}">
+                    <option value="USD" ${cur==='USD'?'selected':''}>USD</option>
+                    <option value="UZS" ${cur==='UZS'?'selected':''}>UZS</option>
+                  </select>
+                  <button data-return="${e.id}">Log return</button>
+                </div>
+              ` : ''}
+            </td>
+            <td class="amount perm">−${fmtCur(e.amount, cur)}${equiv}</td>
+            <td><button class="del-btn" data-del="temporary" data-id="${e.id}">Remove</button></td>
+          </tr>
+        `}).join('') : `<tr class="empty-row"><td colspan="5">Nothing on loan right now.</td></tr>`}
+      </tbody>
+    </table></div>
+  `;
+}
+
+function wireCurOptions(form){
+  if(!form) return;
+  const hidden = form.querySelector('input[name="currency"]');
+  form.querySelectorAll('.cur-opt').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      form.querySelectorAll('.cur-opt').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      hidden.value = btn.dataset.curopt;
+    });
+  });
+}
+
+function attachHandlers(){
+  const incomeForm = document.getElementById('incomeForm');
+  wireCurOptions(incomeForm);
+  if(incomeForm) incomeForm.addEventListener('submit', e=>{
+    e.preventDefault();
+    const f = new FormData(incomeForm);
+    const entry = {
+      id: uid(),
+      date: f.get('date'),
+      source: f.get('source').trim(),
+      amount: parseFloat(f.get('amount')),
+      currency: f.get('currency') || 'USD',
+      note: f.get('note').trim()
+    };
+    freezeAmounts(entry);
+    state.income.push(entry);
+    saveEntry('income', entry);
+
+    if(f.get('saveTemplate')){
+      state.templates.income = state.templates.income || [];
+      const existing = state.templates.income.find(t=>
+        t.source.toLowerCase() === entry.source.toLowerCase() && t.currency === entry.currency
+      );
+      if(existing) existing.amount = entry.amount;
+      else state.templates.income.push({ id: uid(), source: entry.source, amount: entry.amount, currency: entry.currency });
+      saveTemplates();
+    }
+    render();
+  });
+
+  document.querySelectorAll('[data-template]').forEach(chip=>{
+    chip.addEventListener('click', (ev)=>{
+      if(ev.target.classList.contains('chip-x')) return;
+      const t = state.templates.income.find(x=>x.id === chip.dataset.template);
+      if(!t || !incomeForm) return;
+      incomeForm.querySelector('[name="source"]').value = t.source;
+      incomeForm.querySelector('[name="amount"]').value = t.amount;
+      incomeForm.querySelectorAll('.cur-opt').forEach(b=>b.classList.toggle('active', b.dataset.curopt === t.currency));
+      incomeForm.querySelector('[name="currency"]').value = t.currency;
+      incomeForm.querySelector('[name="amount"]').focus();
+      incomeForm.querySelector('[name="amount"]').select();
+    });
+  });
+
+  document.querySelectorAll('[data-del-template]').forEach(x=>{
+    x.addEventListener('click', (ev)=>{
+      ev.stopPropagation();
+      const id = x.dataset.delTemplate;
+      state.templates.income = state.templates.income.filter(t=>t.id !== id);
+      saveTemplates();
+      render();
+    });
+  });
+
+  const permanentForm = document.getElementById('permanentForm');
+  wireCurOptions(permanentForm);
+  if(permanentForm) permanentForm.addEventListener('submit', e=>{
+    e.preventDefault();
+    const f = new FormData(permanentForm);
+    const entry = {
+      id: uid(),
+      date: f.get('date'),
+      category: f.get('category').trim(),
+      amount: parseFloat(f.get('amount')),
+      currency: f.get('currency') || 'USD',
+      note: f.get('note').trim()
+    };
+    freezeAmounts(entry);
+    state.permanent.push(entry);
+    saveEntry('permanent', entry);
+    render();
+  });
+
+  const temporaryForm = document.getElementById('temporaryForm');
+  wireCurOptions(temporaryForm);
+  if(temporaryForm) temporaryForm.addEventListener('submit', e=>{
+    e.preventDefault();
+    const f = new FormData(temporaryForm);
+    const amount = parseFloat(f.get('amount'));
+    const expectedRaw = f.get('expectedAmount');
+    const rateRaw = f.get('interestRate');
+    let expectedAmount = null;
+    if(expectedRaw){
+      expectedAmount = parseFloat(expectedRaw);
+    } else if(rateRaw){
+      const pct = parseFloat(rateRaw);
+      if(!isNaN(pct)) expectedAmount = amount + amount * (pct / 100);
+    }
+    const entry = {
+      id: uid(),
+      date: f.get('date'),
+      category: f.get('category').trim(),
+      amount: amount,
+      currency: f.get('currency') || 'USD',
+      expectedAmount: expectedAmount,
+      interestRate: rateRaw ? parseFloat(rateRaw) : null,
+      dueDate: f.get('dueDate') || null,
+      note: f.get('note').trim(),
+      returns: []
+    };
+    freezeAmounts(entry);
+    freezeExpected(entry);
+    state.temporary.push(entry);
+    saveEntry('temporary', entry);
+    render();
+  });
+
+  document.querySelectorAll('[data-del]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const type = btn.dataset.del;
+      const id = btn.dataset.id;
+      state[type] = state[type].filter(e=>e.id !== id);
+      deleteEntry(type, id);
+      render();
+    });
+  });
+
+  document.querySelectorAll('[data-return]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const id = btn.dataset.return;
+      const input = document.getElementById('return-amt-'+id);
+      const curSelect = document.getElementById('return-cur-'+id);
+      const amt = parseFloat(input.value);
+      if(!amt || amt <= 0) return;
+      const entry = state.temporary.find(e=>e.id===id);
+      if(!entry) return;
+      entry.returns = entry.returns || [];
+      const ret = {date: todayStr(), amount: amt, currency: curSelect ? curSelect.value : (entry.currency||'USD')};
+      freezeAmounts(ret);
+      entry.returns.push(ret);
+      saveEntry('temporary', entry);
+      render();
+    });
+  });
+}
+
+function wireBackup(){
+  const exportBtn = document.getElementById('exportBtn');
+  const importInput = document.getElementById('importInput');
+  if(exportBtn) exportBtn.addEventListener('click', ()=>{
+    const blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'ledger-backup-' + todayStr() + '.json';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  });
+  if(importInput) importInput.addEventListener('change', ()=>{
+    const file = importInput.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = async ()=>{
+      try{
+        const imported = JSON.parse(reader.result);
+        if(!confirm('Replace all current data with this backup? This cannot be undone.')) return;
+        state = Object.assign({income:[], permanent:[], temporary:[], settings:{rate:11800, displayCurrency:'USD'}, templates:{income:[]}}, imported);
+        // Re-save every record so it's actually persisted, not just in memory.
+        const saves = [];
+        ['income','permanent','temporary'].forEach(type=>{
+          (state[type]||[]).forEach(entry=> saves.push(saveEntry(type, entry)));
+        });
+        saves.push(saveSettings(), saveTemplates());
+        await Promise.all(saves);
+        render();
+        alert('Backup restored.');
+      }catch(e){
+        alert('That file could not be read as a backup.');
+        console.error(e);
+      }
+      importInput.value = '';
+    };
+    reader.readAsText(file);
+  });
+}
+wireBackup();
+
+if(isAuthorized()){
+  loadState();
+  const hintEl = document.getElementById('storageHint');
+  if(hintEl){
+    hintEl.textContent = useApi
+      ? 'Saved to your database — synced across your devices.'
+      : 'Saved to this browser only (open inside Telegram to sync to the database).';
+  }
+} else {
+  document.getElementById('appRoot').style.display = 'none';
+  document.getElementById('lockScreen').style.display = 'flex';
+  const detected = currentTelegramUsername();
+  document.getElementById('lockDebug').textContent = detected
+    ? 'Detected Telegram username: @' + detected
+    : 'No Telegram username was detected on this account.';
+}
+</script>
+</body>
+</html>

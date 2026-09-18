@@ -79,6 +79,10 @@
     gap:16px;
     flex-wrap:wrap;
   }
+  header.top > div:first-child{
+    min-width:0;
+    flex:1 1 180px;
+  }
   header.top h1{
     font-family:'Spectral', serif;
     font-weight:600;
@@ -92,6 +96,9 @@
   }
   .balance-block{
     text-align:right;
+    min-width:0;
+    flex:1 1 200px;
+    max-width:100%;
   }
   .balance-label{
     font-size:11px;
@@ -100,8 +107,10 @@
   }
   .balance-value{
     font-family:'IBM Plex Mono', monospace;
-    font-size:32px;
+    font-size:clamp(20px, 6.5vw, 32px);
     font-weight:600;
+    overflow-wrap:break-word;
+    word-break:break-word;
   }
   .balance-value.negative{ color:var(--rust); }
   .balance-value.positive{ color:var(--green); }
@@ -371,6 +380,8 @@
     background:var(--white);
     color:var(--ink);
     border-radius:2px;
+    max-width:100%;
+    width:100%;
   }
   input:focus, select:focus{
     outline:none;
@@ -489,11 +500,43 @@
     margin-top:14px;
   }
 
+  .save-warning{
+    margin-top:10px;
+    padding:8px 12px;
+    background:var(--rust-bg);
+    color:var(--rust);
+    font-size:12px;
+    text-align:center;
+    border:1px solid var(--rust);
+    border-radius:2px;
+  }
+
+  .backup-row{
+    display:flex;
+    justify-content:center;
+    gap:8px;
+    margin-top:14px;
+    flex-wrap:wrap;
+  }
+  .backup-btn{
+    all:unset;
+    cursor:pointer;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    padding:6px 10px;
+    border:1px solid var(--rule-strong);
+    color:var(--ink-soft);
+    border-radius:2px;
+  }
+  .backup-btn:hover{ border-color:var(--brass); color:var(--brass); }
+
   @media (max-width:680px){
+    .app{ padding:18px 12px 70px; }
     .layout{ grid-template-columns:1fr; }
     nav.tabs{
       flex-direction:row;
       overflow-x:auto;
+      -webkit-overflow-scrolling:touch;
       border-right:none;
       border-bottom:1px solid var(--rule-strong);
       padding:8px 4px;
@@ -502,8 +545,10 @@
       border-left:none;
       border-bottom:3px solid transparent;
       padding:8px 12px;
+      white-space:nowrap;
     }
     nav.tabs button.active{ border-bottom-color:var(--brass); }
+    .panel{ padding:18px 14px; }
     form.entry-form, form.entry-form.temp-form{
       grid-template-columns:1fr 1fr;
     }
@@ -511,6 +556,17 @@
     .cat-row{ grid-template-columns:70px 1fr 70px; gap:6px; }
     .cat-label{ font-size:11px; }
     .cat-amount{ font-size:11px; }
+    table.ledger{ font-size:12px; }
+  }
+
+  @media (max-width:480px){
+    header.top{ flex-direction:column; align-items:flex-start; padding-bottom:12px; }
+    .balance-block{ text-align:left; width:100%; }
+    .rate-line{ display:flex; align-items:center; flex-wrap:wrap; gap:4px; }
+    form.entry-form, form.entry-form.temp-form{
+      grid-template-columns:1fr;
+    }
+    form.entry-form > button.add-btn{ justify-self:stretch; }
   }
 </style>
 </head>
@@ -557,6 +613,12 @@
   </div>
 
   <footer class="hint" id="storageHint">Entries are saved automatically and stay here next time you open this.</footer>
+  <div id="saveWarning" class="save-warning" style="display:none;"></div>
+  <div class="backup-row">
+    <button type="button" class="backup-btn" id="exportBtn">Export backup (.json)</button>
+    <label class="backup-btn" for="importInput">Import backup</label>
+    <input type="file" id="importInput" accept="application/json" style="display:none;">
+  </div>
 </div>
 
 <script>
@@ -597,29 +659,38 @@ function isAuthorized(){
 // Storage adapter: uses Telegram CloudStorage when running inside Telegram
 // (syncs across the user's devices), falls back to localStorage otherwise
 // (e.g. when testing this file directly in a normal browser).
+// Every method rejects on failure instead of quietly pretending it worked,
+// so a failed save can actually be surfaced to the user (see markSaveOk /
+// markSaveFailed below) rather than silently vanishing on next open.
 const Store = {
   set(key, value){
-    return new Promise(resolve=>{
-      if(useCloud) TG.CloudStorage.setItem(key, value, ()=>resolve());
-      else { localStorage.setItem(key, value); resolve(); }
+    return new Promise((resolve, reject)=>{
+      if(useCloud) TG.CloudStorage.setItem(key, value, (err, ok)=> err ? reject(err) : resolve(ok));
+      else {
+        try{ localStorage.setItem(key, value); resolve(); }
+        catch(e){ reject(e); }
+      }
     });
   },
   remove(key){
-    return new Promise(resolve=>{
-      if(useCloud) TG.CloudStorage.removeItem(key, ()=>resolve());
-      else { localStorage.removeItem(key); resolve(); }
+    return new Promise((resolve, reject)=>{
+      if(useCloud) TG.CloudStorage.removeItem(key, (err, ok)=> err ? reject(err) : resolve(ok));
+      else {
+        try{ localStorage.removeItem(key); resolve(); }
+        catch(e){ reject(e); }
+      }
     });
   },
   getKeys(){
-    return new Promise(resolve=>{
-      if(useCloud) TG.CloudStorage.getKeys((err, keys)=>resolve(keys||[]));
+    return new Promise((resolve, reject)=>{
+      if(useCloud) TG.CloudStorage.getKeys((err, keys)=> err ? reject(err) : resolve(keys||[]));
       else resolve(Object.keys(localStorage));
     });
   },
   getItems(keys){
-    return new Promise(resolve=>{
+    return new Promise((resolve, reject)=>{
       if(!keys.length) return resolve({});
-      if(useCloud) TG.CloudStorage.getItems(keys, (err, items)=>resolve(items||{}));
+      if(useCloud) TG.CloudStorage.getItems(keys, (err, items)=> err ? reject(err) : resolve(items||{}));
       else {
         const obj = {};
         keys.forEach(k=> obj[k] = localStorage.getItem(k));
@@ -628,6 +699,21 @@ const Store = {
     });
   }
 };
+
+// Surfaces storage failures in the UI instead of letting them fail silently.
+// A failed save means the entry only exists in memory for this session and
+// will be gone next time the app opens, so the user needs to know right away.
+function markSaveFailed(err){
+  console.error('Save failed', err);
+  const el = document.getElementById('saveWarning');
+  if(!el) return;
+  el.textContent = "Couldn't save that — it may be lost when you close the app. Check your connection and try again, or use Export backup below as a safety net.";
+  el.style.display = 'block';
+}
+function markSaveOk(){
+  const el = document.getElementById('saveWarning');
+  if(el) el.style.display = 'none';
+}
 
 let state = {
   income: [],
@@ -774,14 +860,19 @@ async function loadState(){
     }
   }catch(e){
     console.error('Could not load saved data', e);
+    const el = document.getElementById('saveWarning');
+    if(el){
+      el.textContent = "Couldn't load your saved data. If entries seem missing, don't add new ones yet — check your connection and reopen the app first.";
+      el.style.display = 'block';
+    }
   }
   render();
 }
 
-function saveEntry(type, entry){ Store.set(type + ':' + entry.id, JSON.stringify(entry)); }
-function deleteEntry(type, id){ Store.remove(type + ':' + id); }
-function saveSettings(){ Store.set('settings', JSON.stringify(state.settings)); }
-function saveTemplates(){ Store.set('templates', JSON.stringify(state.templates)); }
+function saveEntry(type, entry){ return Store.set(type + ':' + entry.id, JSON.stringify(entry)).then(markSaveOk, markSaveFailed); }
+function deleteEntry(type, id){ return Store.remove(type + ':' + id).then(markSaveOk, markSaveFailed); }
+function saveSettings(){ return Store.set('settings', JSON.stringify(state.settings)).then(markSaveOk, markSaveFailed); }
+function saveTemplates(){ return Store.set('templates', JSON.stringify(state.templates)).then(markSaveOk, markSaveFailed); }
 
 function totals(){
   const income = state.income.reduce((s,e)=>s + displayVal(e), 0);
@@ -1239,6 +1330,49 @@ function attachHandlers(){
     });
   });
 }
+
+function wireBackup(){
+  const exportBtn = document.getElementById('exportBtn');
+  const importInput = document.getElementById('importInput');
+  if(exportBtn) exportBtn.addEventListener('click', ()=>{
+    const blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'ledger-backup-' + todayStr() + '.json';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  });
+  if(importInput) importInput.addEventListener('change', ()=>{
+    const file = importInput.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = async ()=>{
+      try{
+        const imported = JSON.parse(reader.result);
+        if(!confirm('Replace all current data with this backup? This cannot be undone.')) return;
+        state = Object.assign({income:[], permanent:[], temporary:[], settings:{rate:11800, displayCurrency:'USD'}, templates:{income:[]}}, imported);
+        // Re-save every record so it's actually persisted, not just in memory.
+        const saves = [];
+        ['income','permanent','temporary'].forEach(type=>{
+          (state[type]||[]).forEach(entry=> saves.push(saveEntry(type, entry)));
+        });
+        saves.push(saveSettings(), saveTemplates());
+        await Promise.all(saves);
+        render();
+        alert('Backup restored.');
+      }catch(e){
+        alert('That file could not be read as a backup.');
+        console.error(e);
+      }
+      importInput.value = '';
+    };
+    reader.readAsText(file);
+  });
+}
+wireBackup();
 
 if(isAuthorized()){
   loadState();

@@ -63,6 +63,12 @@
     color:var(--ink-soft);
     line-height:1.5;
   }
+  .lock-debug{
+    margin-top:14px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    color:var(--brass);
+  }
   header.top{
     display:flex;
     justify-content:space-between;
@@ -513,7 +519,8 @@
 <div class="lock-screen" id="lockScreen" style="display:none;">
   <div class="lock-box">
     <div class="lock-title">Ledger is private</div>
-    <div class="lock-text">This app is set up for one Telegram account only, and this isn't it.</div>
+    <div class="lock-text">This app is set up for certain Telegram accounts only, and this isn't one of them.</div>
+    <div class="lock-debug" id="lockDebug"></div>
   </div>
 </div>
 
@@ -556,10 +563,9 @@
 const TG = window.Telegram && window.Telegram.WebApp;
 const useCloud = !!(TG && TG.CloudStorage);
 
-// Set this to your own Telegram username (no @), lowercase or not, doesn't matter.
-// Only this username will be able to open the app inside Telegram.
-const ALLOWED_USERNAME = 'yaxyobekpersonal';
-  
+// Add every Telegram username that should be allowed in (no @, one per entry).
+const ALLOWED_USERNAMES = ['yaxyobekpersonal', 'usikandsomenmbrs'];
+
 if(TG){
   TG.ready();
   TG.expand();
@@ -567,17 +573,25 @@ if(TG){
   try{ TG.setBackgroundColor('#F5F1E6'); }catch(e){}
 }
 
+// Strips a leading @, trims spaces, and lowercases — so it matches
+// regardless of how the username was typed on either side.
+function normalizeUsername(u){
+  if(!u) return null;
+  return u.trim().replace(/^@/, '').toLowerCase();
+}
+
 function currentTelegramUsername(){
   const u = TG && TG.initDataUnsafe && TG.initDataUnsafe.user && TG.initDataUnsafe.user.username;
-  return u ? u.toLowerCase() : null;
+  return u || null;
 }
 
 function isAuthorized(){
   // Outside Telegram (e.g. testing this file directly in a browser) there's
   // no Telegram identity to check, so allow it through for local testing.
   if(!TG) return true;
-  const username = currentTelegramUsername();
-  return username === ALLOWED_USERNAME.toLowerCase();
+  const username = normalizeUsername(currentTelegramUsername());
+  const allowed = ALLOWED_USERNAMES.map(normalizeUsername);
+  return username !== null && allowed.includes(username);
 }
 
 // Storage adapter: uses Telegram CloudStorage when running inside Telegram
@@ -1237,6 +1251,10 @@ if(isAuthorized()){
 } else {
   document.getElementById('appRoot').style.display = 'none';
   document.getElementById('lockScreen').style.display = 'flex';
+  const detected = currentTelegramUsername();
+  document.getElementById('lockDebug').textContent = detected
+    ? 'Detected Telegram username: @' + detected
+    : 'No Telegram username was detected on this account.';
 }
 </script>
 </body>
